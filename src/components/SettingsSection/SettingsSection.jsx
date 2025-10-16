@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Upload, Image as ImageIcon, Video, X, Eye, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Upload, Image as ImageIcon, Video, Eye, Trash2 } from "lucide-react";
+import axios from "axios";
 
 const SettingsSection = () => {
   const [mainImage, setMainImage] = useState(null);
@@ -7,21 +8,43 @@ const SettingsSection = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [videoPreview, setVideoPreview] = useState(null);
 
+  const BASE_URL = "http://localhost:3085";
+
+  // ✅ Fetch saved media when component loads
+  useEffect(() => {
+    fetchMedia();
+  }, []);
+
+  const fetchMedia = async () => {
+    try {
+      const response = await axios.get("http://localhost:3085/api/media/latest");
+      if (response.data.success) {
+        const { imageUrl, videoUrl } = response.data.data;
+
+        // Set the preview URLs to backend-hosted files
+        if (imageUrl) setImagePreview(BASE_URL + imageUrl);
+        if (videoUrl) setVideoPreview(BASE_URL + videoUrl);
+      } else {
+        console.log("No media found yet.");
+      }
+    } catch (error) {
+      console.error("Error fetching media:", error);
+    }
+  };
+
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file && file.type.startsWith("image/")) {
       setMainImage(file);
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
+      reader.onload = (e) => setImagePreview(e.target.result);
       reader.readAsDataURL(file);
     }
   };
 
   const handleVideoUpload = (event) => {
     const file = event.target.files[0];
-    if (file && file.type.startsWith('video/')) {
+    if (file && file.type.startsWith("video/")) {
       setVideo(file);
       const videoUrl = URL.createObjectURL(file);
       setVideoPreview(videoUrl);
@@ -36,16 +59,42 @@ const SettingsSection = () => {
   const removeVideo = () => {
     setVideo(null);
     setVideoPreview(null);
-    if (videoPreview) {
-      URL.revokeObjectURL(videoPreview);
-    }
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
   };
 
-  const handleSave = () => {
-    // Here you would typically send the data to your backend
-    console.log('Main Image:', mainImage);
-    console.log('Video:', video);
-    alert('Settings saved successfully!');
+  // ✅ Save (upload or update) media
+  const handleSave = async () => {
+    try {
+      if (!mainImage && !video) {
+        alert("Please upload at least an image or video before saving.");
+        return;
+      }
+
+      const formData = new FormData();
+      if (mainImage) formData.append("image", mainImage);
+      if (video) formData.append("video", video);
+
+      const response = await axios.post(`${BASE_URL}/api/media/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (response.data.success) {
+        alert("Settings saved successfully!");
+        console.log("Saved media:", response.data.data);
+
+        // ✅ Fetch updated media from backend
+        fetchMedia();
+
+        // Clear uploaded files
+        setMainImage(null);
+        setVideo(null);
+      } else {
+        alert("Something went wrong!");
+      }
+    } catch (error) {
+      console.error("Error uploading media:", error);
+      alert("Error saving settings. Check console for details.");
+    }
   };
 
   return (
@@ -54,7 +103,9 @@ const SettingsSection = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-          <p className="text-gray-600">Manage your banner images and promotional videos</p>
+          <p className="text-gray-600">
+            Manage your banner images and promotional videos
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -65,8 +116,12 @@ const SettingsSection = () => {
                 <ImageIcon className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Main Banner Image</h2>
-                <p className="text-gray-600 text-sm">Upload your main promotional banner</p>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Main Banner Image
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  Upload your main promotional banner
+                </p>
               </div>
             </div>
 
@@ -74,14 +129,16 @@ const SettingsSection = () => {
               {imagePreview ? (
                 <div className="space-y-4">
                   <div className="relative">
-                    <img 
-                      src={imagePreview} 
-                      alt="Banner preview" 
+                    <img
+                      src={imagePreview}
+                      alt="Banner preview"
                       className="w-full h-48 object-cover rounded-xl mx-auto"
                     />
                     <div className="absolute top-2 right-2 flex space-x-2">
                       <button
-                        onClick={() => document.getElementById('image-upload').click()}
+                        onClick={() =>
+                          document.getElementById("image-upload").click()
+                        }
                         className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-sm hover:shadow-md transition-all"
                       >
                         <Eye className="w-4 h-4 text-gray-700" />
@@ -95,14 +152,17 @@ const SettingsSection = () => {
                     </div>
                   </div>
                   <div className="text-center">
-                    <p className="text-green-600 text-sm font-medium">Image uploaded successfully!</p>
-                    <p className="text-gray-500 text-xs mt-1">{mainImage?.name}</p>
+                    <p className="text-green-600 text-sm font-medium">
+                      Image loaded successfully!
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">Drag and drop your image here</p>
+                  <p className="text-gray-600 mb-2">
+                    Drag and drop your image here
+                  </p>
                   <p className="text-gray-500 text-sm mb-4">or</p>
                   <input
                     type="file"
@@ -118,21 +178,8 @@ const SettingsSection = () => {
                     <Upload className="w-4 h-4" />
                     <span>Choose Image</span>
                   </label>
-                  <p className="text-gray-500 text-xs mt-3">
-                    Supports: JPG, PNG, WEBP • Max: 5MB
-                  </p>
                 </div>
               )}
-            </div>
-
-            <div className="mt-4 text-sm text-gray-600">
-              <h4 className="font-medium mb-2">Recommended specifications:</h4>
-              <ul className="space-y-1 text-xs">
-                <li>• Resolution: 1920x1080px or higher</li>
-                <li>• Format: JPG, PNG, WEBP</li>
-                <li>• File size: Maximum 5MB</li>
-                <li>• Aspect ratio: 16:9 for best results</li>
-              </ul>
             </div>
           </div>
 
@@ -143,8 +190,12 @@ const SettingsSection = () => {
                 <Video className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Promotional Video</h2>
-                <p className="text-gray-600 text-sm">Upload your promotional video</p>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Promotional Video
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  Upload your promotional video
+                </p>
               </div>
             </div>
 
@@ -152,14 +203,16 @@ const SettingsSection = () => {
               {videoPreview ? (
                 <div className="space-y-4">
                   <div className="relative">
-                    <video 
-                      src={videoPreview} 
+                    <video
+                      src={videoPreview}
                       className="w-full h-48 object-cover rounded-xl mx-auto"
                       controls
                     />
                     <div className="absolute top-2 right-2 flex space-x-2">
                       <button
-                        onClick={() => document.getElementById('video-upload').click()}
+                        onClick={() =>
+                          document.getElementById("video-upload").click()
+                        }
                         className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-sm hover:shadow-md transition-all"
                       >
                         <Eye className="w-4 h-4 text-gray-700" />
@@ -173,14 +226,17 @@ const SettingsSection = () => {
                     </div>
                   </div>
                   <div className="text-center">
-                    <p className="text-green-600 text-sm font-medium">Video uploaded successfully!</p>
-                    <p className="text-gray-500 text-xs mt-1">{video?.name}</p>
+                    <p className="text-green-600 text-sm font-medium">
+                      Video loaded successfully!
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <Video className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">Drag and drop your video here</p>
+                  <p className="text-gray-600 mb-2">
+                    Drag and drop your video here
+                  </p>
                   <p className="text-gray-500 text-sm mb-4">or</p>
                   <input
                     type="file"
@@ -196,22 +252,8 @@ const SettingsSection = () => {
                     <Upload className="w-4 h-4" />
                     <span>Choose Video</span>
                   </label>
-                  <p className="text-gray-500 text-xs mt-3">
-                    Supports: MP4, MOV, AVI • Max: 50MB
-                  </p>
                 </div>
               )}
-            </div>
-
-            <div className="mt-4 text-sm text-gray-600">
-              <h4 className="font-medium mb-2">Recommended specifications:</h4>
-              <ul className="space-y-1 text-xs">
-                <li>• Resolution: 1080p or higher</li>
-                <li>• Format: MP4, MOV, AVI</li>
-                <li>• File size: Maximum 50MB</li>
-                <li>• Duration: 30 seconds to 2 minutes</li>
-                <li>• Aspect ratio: 16:9 for best results</li>
-              </ul>
             </div>
           </div>
         </div>
@@ -233,11 +275,13 @@ const SettingsSection = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {imagePreview && (
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-3">Banner Image Preview</h4>
+                  <h4 className="font-medium text-gray-700 mb-3">
+                    Banner Image Preview
+                  </h4>
                   <div className="bg-gray-100 rounded-2xl p-4">
-                    <img 
-                      src={imagePreview} 
-                      alt="Banner preview" 
+                    <img
+                      src={imagePreview}
+                      alt="Banner preview"
                       className="w-full h-48 object-cover rounded-xl"
                     />
                   </div>
@@ -245,10 +289,12 @@ const SettingsSection = () => {
               )}
               {videoPreview && (
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-3">Video Preview</h4>
+                  <h4 className="font-medium text-gray-700 mb-3">
+                    Video Preview
+                  </h4>
                   <div className="bg-gray-100 rounded-2xl p-4">
-                    <video 
-                      src={videoPreview} 
+                    <video
+                      src={videoPreview}
                       className="w-full h-48 object-cover rounded-xl"
                       controls
                     />
