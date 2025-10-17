@@ -143,30 +143,64 @@ const CatalogPage = () => {
     setShowProductForm(true);
   };
 
-  // ✅ Save or update product
-  const handleSubmitProduct = async (e) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        id: selectedCatalog?.id,
-        catalogName: selectedCatalog?.catalogName,
-        catalogDescription: selectedCatalog?.catalogDescription,
-        catalogImage: selectedCatalog?.catalogImage,
-        ...productForm,
-      };
+// Replace the existing handleSubmitProduct with this function
+const handleSubmitProduct = async (e) => {
+  e.preventDefault();
 
-      const res = await axios.post(`${BASE_URL}/catalog/save`, payload);
-      if (res.data.success) {
-        alert("Product saved successfully!");
-        setShowProductForm(false);
-        setEditingProduct(null);
-        fetchCatalogs();
-      }
-    } catch (err) {
-      console.error("Error saving product:", err);
-      alert("Error saving product");
+  // basic validation
+  if (!selectedCatalog || !selectedCatalog.catalogName) {
+    return alert("Please select a catalog before saving the product.");
+  }
+  if (!productForm.productName || !productForm.realPrice || !productForm.discountPrice) {
+    return alert("Product name, real price and discount price are required.");
+  }
+
+  try {
+    // Build the payload exactly as you requested
+    const payload = {
+      catalogName: selectedCatalog.catalogName,   // name of the existing catalog
+      productName: productForm.productName,
+      productImage: productForm.productImage || null,
+      realPrice: productForm.realPrice ? parseFloat(productForm.realPrice) : null,
+      discountPrice: productForm.discountPrice ? parseFloat(productForm.discountPrice) : null,
+      polishType: productForm.polishType || null,
+      size: productForm.size || null,
+      aboutProduct: productForm.aboutProduct || null,
+      // include productId when editing so backend can update by id if supported
+      productId: editingProduct || null,
+    };
+
+    // POST to the product-specific endpoint
+    const res = await axios.post(`${BASE_URL}/catalog/save-product`, payload);
+
+    if (res.data && res.data.success) {
+      alert(res.data.message || "Product saved successfully!");
+      setShowProductForm(false);
+      setEditingProduct(null);
+      setSelectedCatalog(null);
+      // refresh catalogs so UI shows newly added/updated product
+      fetchCatalogs();
+      // reset product form
+      setProductForm({
+        productName: "",
+        productImage: "",
+        realPrice: "",
+        discountPrice: "",
+        polishType: "",
+        size: "",
+        aboutProduct: "",
+      });
+    } else {
+      // backend returned success: false
+      console.error("Save product failed:", res.data);
+      alert(res.data?.message || "Failed to save product");
     }
-  };
+  } catch (err) {
+    console.error("Error saving product:", err);
+    alert("Error saving product. Check console for details.");
+  }
+};
+
 
   // Discount calculation
   const calculateDiscount = (r, d) => {
