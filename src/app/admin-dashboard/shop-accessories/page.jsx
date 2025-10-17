@@ -33,15 +33,17 @@ const AccessoriesPage = () => {
   const [newAccessoryImage, setNewAccessoryImage] = useState("");
 
   // product form fields
-  const [productForm, setProductForm] = useState({
-    name: "",
-    realPrice: "",
-    discountPrice: "",
-    polishType: "",
-    size: "",
-    about: "",
-    imageUrl: "",
-  });
+const [productForm, setProductForm] = useState({
+  name: "",
+  realPrice: "",
+  discountPrice: "",
+  polishType: "",
+  size: "",
+  about: "",
+  imageUrl: "",
+  quantityAvailable: "", // ✅ Added
+});
+
 
   // ✅ Fetch all accessories
   const fetchAccessories = async () => {
@@ -102,60 +104,104 @@ const AccessoriesPage = () => {
   const handleAddProduct = (accessoryId) => {
     setSelectedAccessory(accessoryId);
     setEditingProduct(null);
-    setProductForm({
-      name: "",
-      realPrice: "",
-      discountPrice: "",
-      polishType: "",
-      size: "",
-      about: "",
-      imageUrl: "",
-    });
+setProductForm({
+  name: "",
+  realPrice: "",
+  discountPrice: "",
+  polishType: "",
+  size: "",
+  about: "",
+  imageUrl: "",
+  quantityAvailable: "", // ✅ Reset added
+});
+
     setShowProductForm(true);
   };
 
-  const handleEditProduct = (accessoryId, accessory) => {
-    setSelectedAccessory(accessoryId);
+const handleEditProduct = (accessory) => {
+  setSelectedAccessory(accessory);
     setEditingProduct(true);
-    setProductForm({
-      name: accessory.productName,
-      realPrice: accessory.realPrice,
-      discountPrice: accessory.discountPrice,
-      polishType: accessory.polishType,
-      size: accessory.size,
-      about: accessory.aboutProduct,
-      imageUrl: accessory.productImage,
-    });
+setProductForm({
+  name: accessory.productName,
+  realPrice: accessory.realPrice,
+  discountPrice: accessory.discountPrice,
+  polishType: accessory.polishType,
+  size: accessory.size,
+  about: accessory.aboutProduct,
+  imageUrl: accessory.productImage,
+  quantityAvailable: accessory.quantityAvailable || "", // ✅ Pre-fill if exists
+});
+
     setShowProductForm(true);
   };
 
-  // ✅ Save or update product
-  const handleSubmitProduct = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await axios.post(`${BASE_URL}/accessory/save`, {
-        id: selectedAccessory,
-        productName: productForm.name,
-        productImage: productForm.imageUrl,
-        realPrice: productForm.realPrice,
-        discountPrice: productForm.discountPrice,
-        polishType: productForm.polishType,
-        size: productForm.size,
-        aboutProduct: productForm.about,
-      });
+// ✅ Save or Update Accessory Product (instant UI update)
+const handleSubmitProduct = async (e) => {
+  e.preventDefault();
 
-      if (res.data.success) {
-        alert("Product saved successfully!");
-        fetchAccessories();
-        setShowProductForm(false);
-        setEditingProduct(null);
-        setSelectedAccessory(null);
-      }
-    } catch (err) {
-      console.error("Error saving product:", err);
-      alert("Error saving product");
+  if (!selectedAccessory || !selectedAccessory.accessoryName) {
+    return alert("Accessory name is missing.");
+  }
+
+  if (!productForm.name || !productForm.realPrice || !productForm.discountPrice) {
+    return alert("Please fill all required product fields.");
+  }
+
+  try {
+const payload = {
+  accessoryName: selectedAccessory.accessoryName,
+  productName: productForm.name,
+  productImage: productForm.imageUrl,
+  realPrice: productForm.realPrice,
+  discountPrice: productForm.discountPrice,
+  polishType: productForm.polishType,
+  size: productForm.size,
+  aboutProduct: productForm.about,
+  quantityAvailable:
+    productForm.quantityAvailable !== "" && !isNaN(productForm.quantityAvailable)
+      ? parseInt(productForm.quantityAvailable)
+      : 0, // ✅ Send quantity, default 0
+};
+
+
+    const res = await axios.post(`${BASE_URL}/accessory/save-product`, payload);
+
+    if (res.data.success) {
+      alert(res.data.message || "Product saved successfully!");
+
+      // ✅ Update accessories list locally without refetch
+      setAccessories((prev) =>
+        prev.map((acc) => {
+          if (acc.accessoryName === selectedAccessory.accessoryName) {
+            return {
+              ...acc,
+              productName: productForm.name,
+              productImage: productForm.imageUrl,
+              realPrice: productForm.realPrice,
+              discountPrice: productForm.discountPrice,
+              polishType: productForm.polishType,
+              size: productForm.size,
+              aboutProduct: productForm.about,
+            };
+          }
+          return acc;
+        })
+      );
+
+      // Close modal
+      setShowProductForm(false);
+      setEditingProduct(null);
+      setSelectedAccessory(null);
+    } else {
+      alert(res.data.message || "Failed to save product.");
     }
-  };
+  } catch (err) {
+    console.error("Error saving product:", err);
+    alert("Server error while saving product.");
+  }
+};
+
+
 
   const calculateDiscount = (r, d) => {
     if (!r || !d) return 0;
@@ -239,46 +285,53 @@ const AccessoriesPage = () => {
 
                 {/* Product Info */}
                 <div className="p-4">
-                  {acc.productName ? (
-                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                      <h3 className="font-semibold text-gray-900">
-                        {acc.productName}
-                      </h3>
-                      <p className="text-sm text-gray-500">{acc.polishType}</p>
-                      <p className="text-xs text-gray-600 line-clamp-2 mt-1">
-                        {acc.aboutProduct}
-                      </p>
-                      <div className="mt-2 text-sm">
-                        <span className="font-semibold text-[#8C3C4E]">
-                          ₹{acc.discountPrice}
-                        </span>
-                        <span className="line-through text-gray-400 ml-2">
-                          ₹{acc.realPrice}
-                        </span>
-                        <span className="ml-2 text-green-600 text-xs">
-                          {calculateDiscount(acc.realPrice, acc.discountPrice)}%
-                          OFF
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleEditProduct(acc.id, acc)}
-                        className="text-blue-600 text-sm mt-2"
-                      >
-                        Edit Product
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-500">
-                      <ImageIcon className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-                      <p>No products yet</p>
-                    </div>
-                  )}
+{acc.productName ? (
+  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+    {acc.productImage && (
+      <img
+        src={acc.productImage}
+        alt={acc.productName}
+        className="w-full h-40 object-cover rounded-xl mb-3"
+      />
+    )}
+    <h3 className="font-semibold text-gray-900 text-lg">
+      {acc.productName}
+    </h3>
+    <p className="text-sm text-gray-500">{acc.polishType}</p>
+    <p className="text-xs text-gray-600 line-clamp-2 mt-1">
+      {acc.aboutProduct}
+    </p>
+    <div className="mt-2 text-sm">
+      <span className="font-semibold text-[#8C3C4E]">
+        ₹{acc.discountPrice}
+      </span>
+      <span className="line-through text-gray-400 ml-2">
+        ₹{acc.realPrice}
+      </span>
+      <span className="ml-2 text-green-600 text-xs">
+        {calculateDiscount(acc.realPrice, acc.discountPrice)}% OFF
+      </span>
+    </div>
+    <button
+      onClick={() => handleEditProduct(acc)}
+      className="text-blue-600 text-sm mt-2"
+    >
+      Edit Product
+    </button>
+  </div>
+) : (
+  <div className="text-center py-6 text-gray-500">
+    <ImageIcon className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+    <p>No products yet</p>
+  </div>
+)}
+
                 </div>
 
                 {/* Add Product */}
                 <div className="p-4 border-t border-gray-200">
                   <button
-                    onClick={() => handleAddProduct(acc.id)}
+                    onClick={() => handleAddProduct(acc)}  // not acc.id
                     className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-200 flex justify-center items-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
@@ -447,6 +500,17 @@ function ProductModal({ productForm, setProductForm, onClose, onSubmit, editingP
             className="w-full border border-gray-300 rounded-xl p-3"
             placeholder="Size"
           />
+          <input
+  type="number"
+  value={productForm.quantityAvailable || ""}
+  onChange={(e) =>
+    setProductForm({ ...productForm, quantityAvailable: e.target.value })
+  }
+  className="w-full border border-gray-300 rounded-xl p-3"
+  placeholder="Available Quantity"
+  min="0"
+/>
+
           <textarea
             value={productForm.about}
             onChange={(e) => setProductForm({ ...productForm, about: e.target.value })}

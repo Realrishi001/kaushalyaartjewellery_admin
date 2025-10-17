@@ -39,6 +39,7 @@ const CatalogPage = () => {
     polishType: "",
     size: "",
     aboutProduct: "",
+    quantityAvailable: "", 
   });
 
   // ✅ Fetch all catalogs
@@ -131,34 +132,35 @@ const CatalogPage = () => {
   const handleEditProduct = (catalog, product) => {
     setSelectedCatalog(catalog);
     setEditingProduct(product.id);
-    setProductForm({
-      productName: product.productName,
-      productImage: product.productImage,
-      realPrice: product.realPrice,
-      discountPrice: product.discountPrice,
-      polishType: product.polishType,
-      size: product.size,
-      aboutProduct: product.aboutProduct,
-    });
+setProductForm({
+  productName: product.productName,
+  productImage: product.productImage,
+  realPrice: product.realPrice,
+  discountPrice: product.discountPrice,
+  polishType: product.polishType,
+  size: product.size,
+  aboutProduct: product.aboutProduct,
+  quantityAvailable: product.quantityAvailable || "", // ✅ prefill if exists
+});
+
     setShowProductForm(true);
   };
 
-// Replace the existing handleSubmitProduct with this function
 const handleSubmitProduct = async (e) => {
   e.preventDefault();
 
-  // basic validation
+  // Basic validation
   if (!selectedCatalog || !selectedCatalog.catalogName) {
     return alert("Please select a catalog before saving the product.");
   }
   if (!productForm.productName || !productForm.realPrice || !productForm.discountPrice) {
-    return alert("Product name, real price and discount price are required.");
+    return alert("Product name, real price, and discount price are required.");
   }
 
   try {
-    // Build the payload exactly as you requested
+    // ✅ Build payload with safer quantity handling
     const payload = {
-      catalogName: selectedCatalog.catalogName,   // name of the existing catalog
+      catalogName: selectedCatalog.catalogName,
       productName: productForm.productName,
       productImage: productForm.productImage || null,
       realPrice: productForm.realPrice ? parseFloat(productForm.realPrice) : null,
@@ -166,21 +168,29 @@ const handleSubmitProduct = async (e) => {
       polishType: productForm.polishType || null,
       size: productForm.size || null,
       aboutProduct: productForm.aboutProduct || null,
-      // include productId when editing so backend can update by id if supported
+      quantityAvailable:
+        productForm.quantityAvailable !== "" &&
+        !isNaN(productForm.quantityAvailable)
+          ? parseInt(productForm.quantityAvailable)
+          : 0, // ✅ Only send 0 if truly empty or invalid
       productId: editingProduct || null,
     };
 
-    // POST to the product-specific endpoint
+    console.log("📦 Sending product payload:", payload);
+
+    // ✅ POST to backend
     const res = await axios.post(`${BASE_URL}/catalog/save-product`, payload);
 
     if (res.data && res.data.success) {
       alert(res.data.message || "Product saved successfully!");
+
+      // Reset form and refresh UI
       setShowProductForm(false);
       setEditingProduct(null);
       setSelectedCatalog(null);
-      // refresh catalogs so UI shows newly added/updated product
       fetchCatalogs();
-      // reset product form
+
+      // ✅ Reset product form after success
       setProductForm({
         productName: "",
         productImage: "",
@@ -189,17 +199,18 @@ const handleSubmitProduct = async (e) => {
         polishType: "",
         size: "",
         aboutProduct: "",
+        quantityAvailable: "", // ✅ reset quantity field
       });
     } else {
-      // backend returned success: false
-      console.error("Save product failed:", res.data);
+      console.error("❌ Save product failed:", res.data);
       alert(res.data?.message || "Failed to save product");
     }
   } catch (err) {
-    console.error("Error saving product:", err);
+    console.error("⚠️ Error saving product:", err);
     alert("Error saving product. Check console for details.");
   }
 };
+
 
 
   // Discount calculation
@@ -531,6 +542,21 @@ const handleSubmitProduct = async (e) => {
                   }
                   className="w-full border border-gray-300 rounded-xl p-3"
                 />
+
+<input
+  type="number"
+  placeholder="Available Quantity"
+  value={productForm.quantityAvailable || ""} // ✅ controlled safely
+  onChange={(e) =>
+    setProductForm({
+      ...productForm,
+      quantityAvailable: e.target.value,
+    })
+  }
+  className="w-full border border-gray-300 rounded-xl p-3"
+  min="0"
+/>
+
 
                 <textarea
                   placeholder="About Product"
